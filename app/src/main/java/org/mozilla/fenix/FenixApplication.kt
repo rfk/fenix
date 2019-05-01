@@ -13,7 +13,8 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.Deferred
-import mozilla.appservices.FenixMegazord
+import mozilla.appservices.Megazord
+import mozilla.appservices.httpconfig.RustHttpConfig
 import mozilla.components.concept.fetch.Client
 import mozilla.components.lib.fetch.httpurlconnection.HttpURLConnectionClient
 import mozilla.components.service.fretboard.Fretboard
@@ -45,8 +46,9 @@ open class FenixApplication : Application() {
         experimentLoader = loadExperiments()
 
         setDayNightTheme()
-        val megazordEnabled = setupMegazord()
-        setupLogging(megazordEnabled)
+        Megazord.init()
+        setupLogging()
+        setupNetworking()
         setupCrashReporting()
 
         if (!isMainProcess()) {
@@ -102,16 +104,17 @@ open class FenixApplication : Application() {
         // no-op, LeakCanary is disabled by default
     }
 
-    private fun setupLogging(megazordEnabled: Boolean) {
+    private fun setupLogging() {
         // We want the log messages of all builds to go to Android logcat
         Log.addSink(AndroidLogSink())
 
-        if (megazordEnabled) {
-            // We want rust logging to go through the log sinks.
-            // This has to happen after initializing the megazord, and
-            // it's only worth doing in the case that we are a megazord.
-            RustLog.enable()
-        }
+        // We want rust logging to go through the log sinks.
+        RustLog.enable()
+    }
+
+    private fun setupNetworking() {
+        val client: Lazy<Client> = lazy { HttpURLConnectionClient() }
+        RustHttpConfig.setClient(client)
     }
 
     private fun loadExperiments(): Deferred<Boolean> {
@@ -139,40 +142,6 @@ open class FenixApplication : Application() {
             .analytics
             .crashReporter
             .install(this)
-    }
-
-    /**
-     * Initiate Megazord sequence! Megazord Battle Mode!
-     *
-     * Mozilla Application Services publishes many native (Rust) code libraries that stand alone: each published Android
-     * ARchive (AAR) contains managed code (classes.jar) and multiple .so library files (one for each supported
-     * architecture). That means consuming multiple such libraries entails at least two .so libraries, and each of those
-     * libraries includes the entire Rust standard library as well as (potentially many) duplicated dependencies. To
-     * save space and allow cross-component native-code Link Time Optimization (LTO, i.e., inlining, dead code
-     * elimination, etc).
-     * Application Services also publishes composite libraries -- so called megazord libraries or just megazords -- that
-     * compose multiple Rust components into a single optimized .so library file.
-     *
-     * @return Boolean indicating if we're in a megazord.
-     */
-    private fun setupMegazord(): Boolean {
-        // mozilla.appservices.FenixMegazord will be missing if we're doing an application-services
-        // dependency substitution locally. That class is supplied dynamically by the org.mozilla.appservices
-        // gradle plugin, and that won't happen if we're not megazording. We won't megazord if we're
-        // locally substituting every module that's part of the megazord's definition, which is what
-        // happens during a local substitution of application-services.
-        // As a workaround, use reflections to conditionally initialize the megazord in case it's present.
-        return try {
-            val megazordClass = Class.forName("mozilla.appservices.FenixMegazord")
-            val megazordInitMethod = megazordClass.getDeclaredMethod("init", Lazy::class.java)
-            // https://github.com/mozilla-mobile/android-components/issues/2715
-            val client: Lazy<Client> = lazy { HttpURLConnectionClient() }
-            megazordInitMethod.invoke(megazordClass, client)
-            true
-        } catch (e: ClassNotFoundException) {
-            Logger.info("mozilla.appservices.FenixMegazord not found; skipping megazord init.")
-            false
-        }
     }
 
     override fun onTrimMemory(level: Int) {
