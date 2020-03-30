@@ -55,6 +55,7 @@ import mozilla.components.service.sync.logins.DefaultLoginValidationDelegate
 import mozilla.components.support.base.feature.PermissionsFeature
 import mozilla.components.support.base.feature.UserInteractionHandler
 import mozilla.components.support.base.feature.ViewBoundFeatureWrapper
+import mozilla.components.support.base.log.logger.Logger
 import mozilla.components.support.ktx.android.view.exitImmersiveModeIfNeeded
 import org.mozilla.fenix.FeatureFlags
 import org.mozilla.fenix.HomeActivity
@@ -474,6 +475,7 @@ abstract class BaseBrowserFragment : Fragment(), UserInteractionHandler, Session
 
             @Suppress("ConstantConditionIf")
             if (!FeatureFlags.asFeatureWebChannelsDisabled) {
+                Logger("features").info("webchannel feature enabled")
                 webchannelIntegration.set(
                     feature = FxaWebChannelFeature(
                         requireContext(),
@@ -487,6 +489,8 @@ abstract class BaseBrowserFragment : Fragment(), UserInteractionHandler, Session
                     owner = this,
                     view = view
                 )
+            } else {
+                Logger("features").info("webchannel feature disabled")
             }
         }
     }

@@ -24,6 +24,7 @@ object FxaServer {
     }
 
     fun config(context: Context): ServerConfig {
-        return ServerConfig(Server.RELEASE, CLIENT_ID, redirectUrl(context))
+        //return ServerConfig(Server.RELEASE, CLIENT_ID, redirectUrl(context))
+        return ServerConfig("http://127.0.0.1:3030", CLIENT_ID, redirectUrl(context))
     }
 }
